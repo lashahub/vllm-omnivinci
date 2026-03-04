@@ -292,11 +292,20 @@ class MediaConnector:
         )
         video_io = VideoMediaIO(image_io, **self.media_io_kwargs.get("video", {}))
 
-        return self.load_from_url(
+        video, metadata = self.load_from_url(
             video_url,
             video_io,
             fetch_timeout=envs.VLLM_VIDEO_FETCH_TIMEOUT,
         )
+        metadata = dict(metadata)
+        metadata.setdefault("video_url", video_url)
+
+        url_spec = parse_url(video_url)
+        if url_spec.scheme == "file":
+            file_path = Path(url2pathname((url_spec.netloc or "") + (url_spec.path or "")))
+            metadata.setdefault("video_path", str(file_path))
+
+        return video, metadata
 
     async def fetch_video_async(
         self,
@@ -314,11 +323,20 @@ class MediaConnector:
         )
         video_io = VideoMediaIO(image_io, **self.media_io_kwargs.get("video", {}))
 
-        return await self.load_from_url_async(
+        video, metadata = await self.load_from_url_async(
             video_url,
             video_io,
             fetch_timeout=envs.VLLM_VIDEO_FETCH_TIMEOUT,
         )
+        metadata = dict(metadata)
+        metadata.setdefault("video_url", video_url)
+
+        url_spec = parse_url(video_url)
+        if url_spec.scheme == "file":
+            file_path = Path(url2pathname((url_spec.netloc or "") + (url_spec.path or "")))
+            metadata.setdefault("video_path", str(file_path))
+
+        return video, metadata
 
     def fetch_image_embedding(
         self,

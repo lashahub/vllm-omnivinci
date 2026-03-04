@@ -35,6 +35,7 @@ from vllm.multimodal.inputs import (
     MultiModalKwargsItems,
 )
 from vllm.multimodal.parse import MultiModalDataItems
+from vllm.multimodal.parse import MultiModalDataParser
 from vllm.multimodal.processing import (
     BaseDummyInputsBuilder,
     BaseMultiModalProcessor,
@@ -272,6 +273,12 @@ class OmniVinciProcessingInfo(BaseProcessingInfo):
     def get_hf_processor(self, **kwargs: object):
         return self.ctx.get_hf_processor(OmniVinciProcessor, **kwargs)
 
+    def get_data_parser(self):
+        return MultiModalDataParser(
+            video_needs_metadata=True,
+            expected_hidden_size=self._get_expected_hidden_size(),
+        )
+
     def get_supported_mm_limits(self) -> Mapping[str, int | None]:
         return {"image": None, "video": None, "audio": None}
 
@@ -303,6 +310,24 @@ class OmniVinciDummyInputsBuilder(BaseDummyInputsBuilder[OmniVinciProcessingInfo
         image_overrides = mm_options.get("image")
         video_overrides = mm_options.get("video")
         audio_overrides = mm_options.get("audio")
+        dummy_videos = self._get_dummy_videos(
+            width=384,
+            height=384,
+            num_frames=8,
+            num_videos=num_videos,
+            overrides=video_overrides,
+        )
+        dummy_videos_with_metadata = [
+            (
+                video,
+                {
+                    "fps": 1.0,
+                    "total_num_frames": int(video.shape[0]),
+                    "frames_indices": list(range(int(video.shape[0]))),
+                },
+            )
+            for video in dummy_videos
+        ]
 
         return {
             "image": self._get_dummy_images(
@@ -311,13 +336,7 @@ class OmniVinciDummyInputsBuilder(BaseDummyInputsBuilder[OmniVinciProcessingInfo
                 num_images=num_images,
                 overrides=image_overrides,
             ),
-            "video": self._get_dummy_videos(
-                width=384,
-                height=384,
-                num_frames=8,
-                num_videos=num_videos,
-                overrides=video_overrides,
-            ),
+            "video": dummy_videos_with_metadata,
             "audio": self._get_dummy_audios(
                 length=30 * 16000,
                 num_audios=num_audios,
