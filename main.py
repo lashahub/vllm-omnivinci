@@ -11,7 +11,8 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 VIDEO_PATH = (ROOT_DIR / "transformers" / "nvidia.mp4").resolve()
 VIDEO_URL = f"file://{VIDEO_PATH}"
 PROMPT_TEXT = "Assess the video, followed by a detailed description of it's video and audio contents."
-GPU_MEMORY_UTILIZATION = 0.65
+GPU_MEMORY_UTILIZATION = 0.50
+NUM_VIDEO_FRAMES = 128
 
 
 def main() -> None:
@@ -40,10 +41,11 @@ def main() -> None:
         model=MODEL_ID,
         dtype="bfloat16",
         trust_remote_code=False,
+        tokenizer_mode="slow",
         gpu_memory_utilization=GPU_MEMORY_UTILIZATION,
         hf_overrides={
             "load_audio_in_video": True,
-            "num_video_frames": 128,
+            "num_video_frames": NUM_VIDEO_FRAMES,
             "audio_chunk_length": "max_3600",
         },
     )
@@ -53,7 +55,14 @@ def main() -> None:
         max_tokens=1024,
     )
 
-    video_data = fetch_video(VIDEO_URL)
+    video_data = fetch_video(
+        VIDEO_URL,
+        video_io_kwargs={
+            "num_frames": NUM_VIDEO_FRAMES,
+            "video_backend": "opencv",
+            "frame_recovery": True,
+        },
+    )
 
     outputs = llm.generate(
         [

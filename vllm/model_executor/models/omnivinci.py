@@ -346,6 +346,47 @@ class OmniVinciDummyInputsBuilder(BaseDummyInputsBuilder[OmniVinciProcessingInfo
 
 
 class OmniVinciMultiModalProcessor(BaseMultiModalProcessor[OmniVinciProcessingInfo]):
+    @staticmethod
+    def _sync_processor_config_from_model(
+        hf_processor: OmniVinciProcessor,
+        hf_config: OmniVinciConfig,
+    ) -> None:
+        """
+        Keep multimodal preprocessing behavior aligned with model runtime config.
+
+        In vLLM, `hf_overrides` are applied to the model config; the processor can
+        otherwise keep stale values loaded from `preprocessor_config.json`.
+        """
+        if getattr(hf_processor, "config", None) is None:
+            return
+
+        processor_config = hf_processor.config
+        for key in (
+            "load_audio_in_video",
+            "interleaved_vis_aud_in_video",
+            "interleaved_video_segment_duration",
+            "num_video_frames",
+            "audio_chunk_length",
+            "audio_sampling_rate",
+            "audio_hop_length",
+            "audio_mel_bins",
+            "image_aspect_ratio",
+            "s2_scales",
+            "s2_resize_output_to_scale_idx",
+            "mm_use_bos_eos_tokens",
+        ):
+            if hasattr(hf_config, key):
+                setattr(processor_config, key, getattr(hf_config, key))
+
+        feature_extractor = getattr(hf_processor, "feature_extractor", None)
+        if feature_extractor is not None:
+            if hasattr(hf_config, "audio_sampling_rate"):
+                feature_extractor.sampling_rate = int(hf_config.audio_sampling_rate)
+            if hasattr(hf_config, "audio_hop_length"):
+                feature_extractor.hop_length = int(hf_config.audio_hop_length)
+            if isinstance(getattr(hf_config, "audio_chunk_length", None), int):
+                feature_extractor.chunk_length = int(hf_config.audio_chunk_length)
+
     def _call_hf_processor(
         self,
         prompt: str,
@@ -357,6 +398,7 @@ class OmniVinciMultiModalProcessor(BaseMultiModalProcessor[OmniVinciProcessingIn
 
         hf_processor = self.info.get_hf_processor(**mm_kwargs)
         hf_config = self.info.get_hf_config()
+        self._sync_processor_config_from_model(hf_processor, hf_config)
 
         images = mm_data.get("images")
         videos = mm_data.get("videos")
