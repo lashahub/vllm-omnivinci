@@ -273,6 +273,11 @@ class OmniVinciProcessingInfo(BaseProcessingInfo):
     def get_hf_processor(self, **kwargs: object):
         return self.ctx.get_hf_processor(OmniVinciProcessor, **kwargs)
 
+    def get_default_tok_params(self):
+        # Chat templates already contain all control tokens; avoid adding an
+        # extra wrapper tokenization layer that can skew generation tails.
+        return super().get_default_tok_params().with_kwargs(add_special_tokens=False)
+
     def get_data_parser(self):
         return MultiModalDataParser(
             video_needs_metadata=True,
